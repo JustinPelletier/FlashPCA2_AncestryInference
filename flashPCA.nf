@@ -252,7 +252,7 @@ process run_flashpca_reference {
   """
   echo "FlashPCA2 version:"
   ${params.flashpca_bin} --help | head -5
-  
+
   ${params.flashpca_bin} \
     --bfile reference_pruned \
     --ndim ${params.nPCs} \
@@ -360,14 +360,16 @@ process run_pca_analysis_projection {
 workflow {
 
   def ref_ch = Channel.fromPath(params.input_reference, checkIfExists: true)
-    .map { f ->
-      def m = (f.name =~ /chr(\\d+)/)
-      if (m) {
-        def c = m[0][1] as Integer
-        if (c >= 1 && c <= 22) tuple(c.toString(), f, file(f.toString() + '.tbi'))
-      }
+  .map { f ->
+    def m = (f.name =~ /chr(\d+)/)
+    if (m) {
+      def c = m[0][1] as Integer
+      if (c >= 1 && c <= 22) tuple(c.toString(), f, file(f.toString() + '.tbi'))
     }
-    .filter { it != null }
+  }
+  .filter { it != null }
+  
+  ref_ch.view { "REF_INPUT: $it" }
 
   def ref_qc = qc_norm_ref(ref_ch)
 
@@ -382,7 +384,7 @@ workflow {
 
     def study_ch = Channel.fromPath(params.input_study, checkIfExists: true)
       .map { f ->
-        def m = (f.name =~ /chr(\\d+)/)
+        def m = (f.name =~ /chr(\d+)/)
         if (m) {
           def c = m[0][1] as Integer
           if (c >= 1 && c <= 22) tuple(c.toString(), f, file(f.toString() + '.tbi'))
