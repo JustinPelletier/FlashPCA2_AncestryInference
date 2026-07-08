@@ -4,6 +4,7 @@ nextflow.enable.dsl = 2
 params.nPCs = params.nPCs ?: 20
 params.outdir = params.outdir ?: "results/FlashPCA2_PCA"
 
+
 // ------------------------------------------------------------
 // QC reference
 // ------------------------------------------------------------
@@ -302,18 +303,20 @@ process run_pca_analysis_reference {
 
   input:
     path ref_pca_file
+    path pca_script
+    path meta_file
 
   output:
     path "*"
 
   script:
   """
-  module load r
+  module load r/4.5.0
   mkdir -p plot_PCA
 
-  Rscript PCA_flashpca.R \
+  Rscript ${pca_script} \
     ${ref_pca_file} \
-    ${params.meta_file} \
+    ${meta_file} \
     NONE \
     reference_only \
     ${params.k} \
@@ -333,19 +336,22 @@ process run_pca_analysis_projection {
   input:
     path ref_pca_file
     path study_pca_file
+    path pca_script
+    path meta_file
+    path study_id_file
 
   output:
     path "*"
 
   script:
   """
-  module load r
+  module load r/4.5.0
   mkdir -p plot_PCA
 
-  Rscript PCA_flashpca.R \
+  Rscript ${pca_script} \
     ${ref_pca_file} \
-    ${params.meta_file} \
-    ${params.qc_study_list} \
+    ${meta_file} \
+    ${study_id_file} \
     projection \
     ${params.k} \
     ${params.n_pcs} \
@@ -369,7 +375,7 @@ workflow {
   }
   .filter { it != null }
   
-  ref_ch.view { "REF_INPUT: $it" }
+  //ref_ch.view { "REF_INPUT: $it" }
 
   def ref_qc = qc_norm_ref(ref_ch)
 
@@ -419,38 +425,53 @@ workflow {
 
   def (ref_pcs, ref_evals, ref_loadings, ref_meansd) = run_flashpca_reference(ref_bed, ref_bim, ref_fam)
 
+  def pca_script = file("bin/PCA.R")
+  def meta_file  = file(params.meta_file)
+
   if (params.run_projection) {
 
-    def prune_lists = ref_pruned.map { chr, bed, bim, fam, prune_list ->
-      tuple(chr, prune_list)
-    }
+      def study_id_file = file(params.qc_study_list)
 
-    def study_for_prune = study_shared_for_projection.join(prune_lists)
-      .map { chr, study_vcf, study_tbi, prune_list ->
-        tuple(chr, study_vcf, study_tbi, prune_list)
+      def prune_lists = ref_pruned.map { chr, bed, bim, fam, prune_list ->
+        tuple(chr, prune_list)
       }
 
-    def study_pruned = prepare_study_pruned(study_for_prune)
+      def study_for_prune = study_shared_for_projection.join(prune_lists)
+        .map { chr, study_vcf, study_tbi, prune_list ->
+          tuple(chr, study_vcf, study_tbi, prune_list)
+        }
 
-    def study_beds = study_pruned.map { it[1] }.collect()
-    def study_bims = study_pruned.map { it[2] }.collect()
-    def study_fams = study_pruned.map { it[3] }.collect()
+      def study_pruned = prepare_study_pruned(study_for_prune)
 
-    def (study_bed, study_bim, study_fam) = merge_plink_study(study_beds, study_bims, study_fams)
+      def study_beds = study_pruned.map { it[1] }.collect()
+      def study_bims = study_pruned.map { it[2] }.collect()
+      def study_fams = study_pruned.map { it[3] }.collect()
 
-    def projected = project_study_flashpca(
-      study_bed,
-      study_bim,
-      study_fam,
-      ref_loadings,
-      ref_meansd
-    )
+      def (study_bed, study_bim, study_fam) = merge_plink_study(study_beds, study_bims, study_fams)
 
-    run_pca_analysis_projection(ref_pcs, projected)
+      def projected = project_study_flashpca(
+        study_bed,
+        study_bim,
+        study_fam,
+        ref_loadings,
+        ref_meansd
+      )
 
-    } else {
+      run_pca_analysis_projection(
+        ref_pcs,
+        projected,
+        pca_script,
+        meta_file,
+        study_id_file
+      )
 
-        run_pca_analysis_reference(ref_pcs)
-    }
+  } else {
+
+      run_pca_analysis_reference(
+        ref_pcs,
+        pca_script,
+        meta_file
+      )
+  }
 }
 
