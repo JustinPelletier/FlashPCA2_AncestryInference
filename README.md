@@ -2,7 +2,6 @@
 
 **FlashPCA2_AncestryInference** is a modular [Nextflow DSL2](https://www.nextflow.io/) pipeline for **population structure analysis and ancestry inference** using **FlashPCA2**. The pipeline performs rigorous variant quality control, LD pruning, principal component analysis (PCA) on a reference panel, and optional projection of study samples onto the reference PCA space.
 
-Inspired by Peyton McClelland's pipeline: https://github.com/CERC-Genomic-Medicine/HGDP_1KG_ancestry_inference
 
 ---
 
