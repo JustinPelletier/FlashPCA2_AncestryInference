@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --account=ctb-hussinju
+#SBATCH --account=<...>
 #SBATCH --time=4:00:00
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=16G
