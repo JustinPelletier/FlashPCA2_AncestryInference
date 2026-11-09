@@ -425,37 +425,63 @@ workflow {
 
   def (ref_pcs, ref_evals, ref_loadings, ref_meansd) = run_flashpca_reference(ref_bed, ref_bim, ref_fam)
 
-  def pca_script = file("bin/PCA.R")
-  def meta_file  = file(params.meta_file)
+  
+  // ------------------------------------------------------------
+  // Optional plotting inputs
+  // ------------------------------------------------------------
+  def pca_script
+  def meta_file
 
+  if (params.run_plotting) {
+
+    if (!params.meta_file?.trim()) {
+      error "When --run_plotting true, you must provide --meta_file"
+    }
+
+    pca_script = file("${projectDir}/bin/PCA.R", checkIfExists: true)
+    meta_file  = file(params.meta_file, checkIfExists: true)
+  }
+
+  // ------------------------------------------------------------
+  // Optional study projection
+  // ------------------------------------------------------------
   if (params.run_projection) {
 
-      def study_id_file = file(params.qc_study_list)
+    def study_id_file = file(params.qc_study_list)
 
-      def prune_lists = ref_pruned.map { chr, bed, bim, fam, prune_list ->
-        tuple(chr, prune_list)
+    def prune_lists = ref_pruned.map { chr, bed, bim, fam, prune_list ->
+      tuple(chr, prune_list)
+    }
+
+    def study_for_prune = study_shared_for_projection.join(prune_lists)
+      .map { chr, study_vcf, study_tbi, prune_list ->
+        tuple(chr, study_vcf, study_tbi, prune_list)
       }
 
-      def study_for_prune = study_shared_for_projection.join(prune_lists)
-        .map { chr, study_vcf, study_tbi, prune_list ->
-          tuple(chr, study_vcf, study_tbi, prune_list)
-        }
+    def study_pruned = prepare_study_pruned(study_for_prune)
 
-      def study_pruned = prepare_study_pruned(study_for_prune)
+    def study_beds = study_pruned.map { it[1] }.collect()
+    def study_bims = study_pruned.map { it[2] }.collect()
+    def study_fams = study_pruned.map { it[3] }.collect()
 
-      def study_beds = study_pruned.map { it[1] }.collect()
-      def study_bims = study_pruned.map { it[2] }.collect()
-      def study_fams = study_pruned.map { it[3] }.collect()
+    def (study_bed, study_bim, study_fam) = merge_plink_study(
+      study_beds,
+      study_bims,
+      study_fams
+    )
 
-      def (study_bed, study_bim, study_fam) = merge_plink_study(study_beds, study_bims, study_fams)
+    def projected = project_study_flashpca(
+      study_bed,
+      study_bim,
+      study_fam,
+      ref_loadings,
+      ref_meansd
+    )
 
-      def projected = project_study_flashpca(
-        study_bed,
-        study_bim,
-        study_fam,
-        ref_loadings,
-        ref_meansd
-      )
+    // ------------------------------------------------------------
+    // Plot reference PCA + projected study samples (optional)
+    // ------------------------------------------------------------
+    if (params.run_plotting) {
 
       run_pca_analysis_projection(
         ref_pcs,
@@ -464,14 +490,20 @@ workflow {
         meta_file,
         study_id_file
       )
+    }
 
   } else {
+
+    // ------------------------------------------------------------
+    // Plot reference-only PCA (optional)
+    // ------------------------------------------------------------
+    if (params.run_plotting) {
 
       run_pca_analysis_reference(
         ref_pcs,
         pca_script,
         meta_file
       )
+    }
   }
 }
-
