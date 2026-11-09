@@ -257,6 +257,7 @@ process run_flashpca_reference {
   ${params.flashpca_bin} \
     --bfile reference_pruned \
     --ndim ${params.nPCs} \
+    --outpve reference_flashpca.pve \
     --outvec reference_flashpca.eigenvectors \
     --outval reference_flashpca.eigenvalues \
     --outload reference_flashpca.loadings \
