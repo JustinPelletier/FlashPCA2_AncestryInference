@@ -248,6 +248,7 @@ process run_flashpca_reference {
     path "reference_flashpca.eigenvalues"
     path "reference_flashpca.loadings"
     path "reference_flashpca.meansd"
+    path "reference_flashpca.pve"
 
   script:
   """
